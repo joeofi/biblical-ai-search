@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>One For Israel - Biblical AI Search</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'israel-blue': '#0038B8',
+                        'israel-light': '#F5F8FF',
+                        'israel-gold': '#FFD700',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom styles for a more polished look */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+        }
+        .container {
+            max-width: 800px;
+        }
+        .response-card {
+            border-left: 4px solid #0038B8;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+        }
+        .resource-link:hover {
+            color: #0038B8;
+        }
+        .biblical-quote {
+            background-color: #FFFBEB; /* Light yellow background */
+            border-left: 4px solid #FBBF24; /* Amber/Gold color */
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center">
+
+    <!-- Header -->
+    <header class="w-full container text-center mb-8">
+        <h1 class="text-4xl font-extrabold text-israel-blue">
+            <span class="text-israel-gold">One For Israel</span> AI Search
+        </h1>
+        <p class="text-lg text-gray-600 mt-2">Ask a question about the Bible, Israel, or biblical principles.</p>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="w-full container bg-white p-6 sm:p-8 rounded-xl shadow-2xl">
+
+        <!-- Search Input -->
+        <div class="flex flex-col sm:flex-row gap-3 mb-8">
+            <input
+                id="questionInput"
+                type="text"
+                placeholder="E.g., What is the significance of the Jewish feast of Tabernacles?"
+                class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-israel-blue focus:border-israel-blue"
+                onkeypress="if(event.key === 'Enter') document.getElementById('searchButton').click()"
+            />
+            <button
+                id="searchButton"
+                onclick="performSearch()"
+                class="bg-israel-blue text-white font-semibold py-3 px-6 rounded-lg hover:bg-opacity-90 transition duration-150 shadow-md flex items-center justify-center disabled:opacity-50"
+            >
+                Search
+            </button>
+        </div>
+
+        <!-- Loading and Error Messages -->
+        <div id="statusArea" class="text-center mb-4 min-h-[24px]">
+            <div id="loadingIndicator" class="hidden text-israel-blue font-medium flex items-center justify-center">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-israel-blue" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Searching...
+            </div>
+            <p id="errorMessage" class="hidden text-red-500 font-medium"></p>
+        </div>
+
+        <!-- AI Response Area -->
+        <div id="responseArea" class="hidden mt-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">AI Response</h2>
+            <div id="aiText" class="response-card bg-israel-light p-5 rounded-lg text-gray-700 leading-relaxed whitespace-pre-wrap">
+                <!-- AI generated text will be inserted here -->
+            </div>
+            
+            <div id="resources" class="mt-8">
+                <h3 class="text-xl font-bold text-gray-800 mb-3">Suggested Resources</h3>
+                <div id="resourceList" class="space-y-3">
+                    <!-- Resource links (simulated articles, videos, podcasts) will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script type="module">
+        // Gemini API Configuration
+        const apiKey = ""; // Leave as-is, will be populated by the environment
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        /**
+         * Converts base64 to ArrayBuffer for playing TTS audio.
+         * (This function is kept for completeness but not currently used for this feature)
+         */
+        const base64ToArrayBuffer = (base64) => {
+            const binaryString = atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        };
+
+        /**
+         * Converts PCM data (raw audio) to a WAV Blob.
+         * (This function is kept for completeness but not currently used for this feature)
+         */
+        const pcmToWav = (pcm16, sampleRate) => {
+            const buffer = new ArrayBuffer(44 + pcm16.length * 2);
+            const view = new DataView(buffer);
+            let offset = 0;
+
+            const writeString = (str) => {
+                for (let i = 0; i < str.length; i++) {
+                    view.setUint8(offset + i, str.charCodeAt(i));
+                }
+                offset += str.length;
+            };
+
+            // RIFF chunk
+            writeString('RIFF');
+            view.setUint32(offset, 36 + pcm16.length * 2, true); offset += 4;
+            writeString('WAVE');
+
+            // FMT chunk
+            writeString('fmt ');
+            view.setUint32(offset, 16, true); offset += 4; // Sub-chunk size (16 for PCM)
+            view.setUint16(offset, 1, true); offset += 2;  // Audio format (1 = PCM)
+            view.setUint16(offset, 1, true); offset += 2;  // Channels (1 = Mono)
+            view.setUint32(offset, sampleRate, true); offset += 4; // Sample rate
+            view.setUint32(offset, sampleRate * 2, true); offset += 4; // Byte rate (SampleRate * Channels * BitsPerSample / 8)
+            view.setUint16(offset, 2, true); offset += 2;  // Block align (Channels * BitsPerSample / 8)
+            view.setUint16(offset, 16, true); offset += 2; // Bits per sample (16)
+
+            // DATA chunk
+            writeString('data');
+            view.setUint32(offset, pcm16.length * 2, true); offset += 4;
+
+            // Write PCM data
+            for (let i = 0; i < pcm16.length; i++) {
+                view.setInt16(offset, pcm16[i], true);
+                offset += 2;
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        };
+
+        const questionInput = document.getElementById('questionInput');
+        const searchButton = document.getElementById('searchButton');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const errorMessage = document.getElementById('errorMessage');
+        const responseArea = document.getElementById('responseArea');
+        const aiTextDiv = document.getElementById('aiText');
+        const resourceList = document.getElementById('resourceList');
+
+        /**
+         * Performs the search against the Gemini API.
+         * Includes exponential backoff for retries.
+         */
+        window.performSearch = async function() {
+            const rawUserQuery = questionInput.value.trim();
+            if (!rawUserQuery) {
+                errorMessage.textContent = "Please enter a question to search.";
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            // --- CRITICAL CHANGE: Prepends the site-specific filter to the user query ---
+            const domainFilter = "site:www.oneforisrael.org";
+            const processedQuery = `${domainFilter} ${rawUserQuery}`;
+
+            // Reset UI states
+            errorMessage.classList.add('hidden');
+            responseArea.classList.add('hidden');
+            aiTextDiv.innerHTML = '';
+            resourceList.innerHTML = '';
+            searchButton.disabled = true;
+            loadingIndicator.classList.remove('hidden');
+
+            // --- UPDATED SYSTEM PROMPT ---
+            const systemPrompt = `Crucial Instruction: If the user's question is *not* related to the Bible, biblical principles, or the nation of Israel, you MUST respond politely by stating, 'I am only specialized in answering questions about the Bible, biblical principles, and the ministry of One For Israel, using content exclusively from www.oneforisrael.org. Please try a different, related question.' Do not attempt to answer off-topic questions.
+
+            You are a helpful AI assistant specialized in the Bible, biblical principles, and the content of the 'one for israel' ministry. Your primary goal is to answer user questions using content **EXCLUSIVELY from www.oneforisrael.org** (as the query is pre-filtered for you). Always incorporate a relevant biblical quotation (KJV preferred, but context matters) and use the search grounding sources to simulate finding media from the website. Structure your response clearly: 
+            1. An analysis/answer that is thorough and encouraging.
+            2. A relevant Bible verse. Format this verse in a separate paragraph styled like a blockquote (e.g., "The Lord bless thee, and keep thee." - Numbers 6:24).
+            3. Suggested resources. For the suggested resources, use the grounding sources provided by Google Search. Do NOT make up links. If search results are available, present them as 'One for Israel Resources (Articles/Videos/Podcasts)' and list them below.`;
+
+            const payload = {
+                contents: [{ parts: [{ text: processedQuery }] }], // Use the processed query with the site filter
+                tools: [{ "google_search": {} }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+            };
+
+            let response = null;
+            const maxRetries = 5;
+            let delay = 1000;
+
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        break; // Success
+                    } else if (response.status === 429 && i < maxRetries - 1) {
+                        // Retry with exponential backoff for rate limiting
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2;
+                    } else {
+                        throw new Error(`API returned status ${response.status}`);
+                    }
+                } catch (error) {
+                    if (i === maxRetries - 1) {
+                        console.error('API call failed after all retries:', error);
+                        errorMessage.textContent = 'An error occurred while communicating with the AI. Please try again later.';
+                        errorMessage.classList.remove('hidden');
+                        return;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2;
+                }
+            }
+
+            try {
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    const text = candidate.content.parts[0].text;
+                    let sources = [];
+
+                    const groundingMetadata = candidate.groundingMetadata;
+                    if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                        sources = groundingMetadata.groundingAttributions
+                            .map(attribution => ({
+                                uri: attribution.web?.uri,
+                                title: attribution.web?.title,
+                            }))
+                            .filter(source => source.uri && source.title && source.uri.includes('oneforisrael.org')); // Ensure links are from the correct domain
+                    }
+
+                    displayResults(text, sources);
+
+                } else {
+                    errorMessage.textContent = 'AI could not generate a response for that query.';
+                    errorMessage.classList.remove('hidden');
+                }
+            } catch (e) {
+                console.error('Error processing API response:', e);
+                errorMessage.textContent = 'Error processing the AI response data.';
+                errorMessage.classList.remove('hidden');
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                searchButton.disabled = false;
+            }
+        };
+
+        /**
+         * Renders the AI's text and the grounding sources (links).
+         * @param {string} text The generated text from the AI.
+         * @param {Array<{uri: string, title: string}>} sources Array of grounding sources.
+         */
+        function displayResults(text, sources) {
+            // Find the section of the text that contains the Bible verse for special styling
+            const verseRegex = /(".*?"\s*-\s*[^.\n]*)/s;
+            const verseMatch = text.match(verseRegex);
+            
+            let formattedText = text;
+
+            if (verseMatch) {
+                const verseBlock = verseMatch[0];
+                const styledVerse = `<div class="biblical-quote p-4 rounded-md italic mt-4 mb-4 text-gray-800">${verseBlock}</div>`;
+                formattedText = text.replace(verseBlock, styledVerse);
+            }
+
+            // Replace newlines with <br> for better presentation
+            aiTextDiv.innerHTML = formattedText.replace(/\n/g, '<br>');
+            
+            // Render Resources
+            resourceList.innerHTML = '';
+            if (sources.length > 0) {
+                sources.forEach((source, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'flex items-start';
+                    item.innerHTML = `
+                        <span class="text-israel-gold mr-2 text-lg">•</span>
+                        <a href="${source.uri}" target="_blank" class="resource-link text-gray-700 hover:underline transition duration-150">
+                            <span class="font-medium">${source.title}</span> 
+                            <span class="text-sm text-gray-500 truncate inline-block w-40 sm:w-auto">(${source.uri.substring(0, 50)}...)</span>
+                        </a>
+                    `;
+                    resourceList.appendChild(item);
+                });
+            } else {
+                resourceList.innerHTML = '<p class="text-gray-500">No specific resources from www.oneforisrael.org were found via search grounding for this query.</p>';
+            }
+
+            responseArea.classList.remove('hidden');
+        }
+
+        // Set focus on input when page loads
+        window.onload = () => {
+            questionInput.focus();
+        };
+    </script>
+</body>
+</html>
