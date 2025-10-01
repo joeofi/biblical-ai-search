@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-Version 6
+Version 7
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -121,14 +121,27 @@ Version 6
         <!-- AI Response Area -->
         <div id="responseArea" class="hidden mt-6">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">AI Response</h2>
-            <div id="aiText" class="response-card bg-israel-light p-5 rounded-lg text-gray-700 leading-relaxed whitespace-pre-wrap">
-                <!-- AI generated text will be inserted here -->
+            
+            <!-- NEW SECTION: One For Israel Analysis -->
+            <div id="ofiAnalysisContainer" class="mb-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-2">One For Israel Analysis</h3>
+                <div id="ofiAnalysisText" class="response-card bg-israel-light p-5 rounded-lg text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    <!-- OFI grounded text will be inserted here -->
+                </div>
+            </div>
+
+            <!-- NEW SECTION: Biblical Answer -->
+            <div id="biblicalAnswerContainer">
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Answer from the Bible</h3>
+                <div id="biblicalAnswerText" class="response-card bg-israel-light p-5 rounded-lg text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    <!-- Biblical answer text (including styled quote) will be inserted here -->
+                </div>
             </div>
             
             <div id="resources" class="mt-8">
                 <h3 class="text-xl font-bold text-gray-800 mb-3">Suggested Resources</h3>
                 <div id="resourceList" class="space-y-3">
-                    <!-- Resource links (simulated articles, videos, podcasts) will be inserted here -->
+                    <!-- Resource links will be inserted here -->
                 </div>
             </div>
         </div>
@@ -141,7 +154,7 @@ Version 6
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
         // Define the current app version
-        const appVersion = "1.0.4"; // Updated version after structural link fix
+        const appVersion = "1.0.5"; // Updated version after structural link fix
 
         /**
          * Utility functions (kept for completeness but not currently used for TTS)
@@ -154,7 +167,11 @@ Version 6
         const loadingIndicator = document.getElementById('loadingIndicator');
         const errorMessage = document.getElementById('errorMessage');
         const responseArea = document.getElementById('responseArea');
-        const aiTextDiv = document.getElementById('aiText');
+        
+        // --- UPDATED TARGET ELEMENTS ---
+        const ofiAnalysisTextDiv = document.getElementById('ofiAnalysisText');
+        const biblicalAnswerTextDiv = document.getElementById('biblicalAnswerText');
+        
         const resourceList = document.getElementById('resourceList');
 
         /**
@@ -169,30 +186,33 @@ Version 6
                 return;
             }
 
-            // --- MODIFIED CRITICAL CHANGE: Prepends filter for both website AND YouTube channel ---
-            // Use Google's search operators to search both the website and the YouTube channel
+            // --- CRITICAL CHANGE: Prepends filter for both website AND YouTube channel ---
             const domainFilter = "site:www.oneforisrael.org OR site:youtube.com/@OneforIsrael"; 
             const processedQuery = `${domainFilter} ${rawUserQuery}`;
 
             // Reset UI states
             errorMessage.classList.add('hidden');
             responseArea.classList.add('hidden');
-            aiTextDiv.innerHTML = '';
+            ofiAnalysisTextDiv.innerHTML = ''; // Reset new elements
+            biblicalAnswerTextDiv.innerHTML = ''; // Reset new elements
             resourceList.innerHTML = '';
             searchButton.disabled = true;
             loadingIndicator.classList.remove('hidden');
 
-            // --- UPDATED SYSTEM PROMPT: Now includes permission to use YouTube content ---
+            // --- UPDATED SYSTEM PROMPT: Enforcing structured two-part response ---
             const systemPrompt = `Crucial Instruction: If the user's question is *not* related to the Bible, biblical principles, or the nation of Israel, you MUST respond politely by stating, 'I am only specialized in answering questions about the Bible, biblical principles, and the ministry of One For Israel, using content exclusively from www.oneforisrael.org and its official YouTube channel. Please try a different, related question.' Do not attempt to answer off-topic questions.
 
-            You are a helpful AI assistant specialized in the Bible, biblical principles, and the content of the 'one for israel' ministry. Your primary goal is to answer user questions using content **EXCLUSIVELY from www.oneforisrael.org OR the official One For Israel YouTube channel** (as the query is pre-filtered for you). 
-            
-            If the query is about a person frequently mentioned on the site (e.g., Erez, Moti, etc.), prioritize identifying their role within the One For Israel ministry in your answer.
+            You are a helpful AI assistant specialized in the Bible, biblical principles, and the content of the 'one for israel' ministry. Your entire response MUST be structured in two mandatory parts, using the delimiters:
 
-            Always incorporate a relevant biblical quotation (KJV preferred, but context matters) and use the search grounding sources to simulate finding media from the website and YouTube channel. Structure your response clearly: 
-            1. An analysis/answer that is thorough and encouraging, addressing the role of personnel if relevant.
-            2. A relevant Bible verse. Format this verse in a separate paragraph styled like a blockquote (e.g., "The Lord bless thee, and keep thee." - Numbers 6:24).
-            3. Suggested resources. For the suggested resources, use the grounding sources provided by Google Search. Do NOT make up links. If search results are available, present them as 'One for Israel Resources (Articles/Videos/Podcasts)' and list them below.`;
+            1.  **---OFI\_ANALYSIS---**: The answer based on content found on www.oneforisrael.org or its YouTube channel.
+            2.  **---BIBLICAL\_ANSWER---**: A direct answer derived *only* from scripture, including a relevant biblical quotation (KJV preferred).
+
+            Your response must strictly follow this format (do not include the title line in the output):
+            ---OFI_ANALYSIS---
+            [Analysis text grounded in search results. Address personnel roles if relevant.]
+            ---BIBLICAL_ANSWER---
+            [Scripture-based answer. Include the Bible verse formatted as a blockquote within this section, e.g., "Scripture text." - Book Chapter:Verse]
+            `;
 
             const payload = {
                 contents: [{ parts: [{ text: processedQuery }] }], // Use the processed query with the combined site filter
@@ -263,7 +283,7 @@ Version 6
                                 uri: attribution.web?.uri,
                                 title: attribution.web?.title,
                             }))
-                            // --- MODIFIED SOURCE FILTERING: Accept links from both website and YouTube ---
+                            // --- SOURCE FILTERING: Accept links from both website and YouTube ---
                             .filter(source => source.uri && source.title && 
                                 (source.uri.includes('oneforisrael.org') || source.uri.includes('youtube.com'))); 
                     }
@@ -286,24 +306,42 @@ Version 6
 
         /**
          * Renders the AI's text and the grounding sources (links).
+         * Now parses the two distinct sections (OFI Analysis and Biblical Answer)
          * @param {string} text The generated text from the AI.
          * @param {Array<{uri: string, title: string}>} sources Array of grounding sources.
          */
         function displayResults(text, sources) {
-            // Find the section of the text that contains the Bible verse for special styling
+            // --- PARSING LOGIC: Split the response based on the mandatory delimiters ---
+            const parts = text.split('---BIBLICAL_ANSWER---');
+            let ofiAnalysis = parts[0];
+            let biblicalAnswer = parts.length > 1 ? parts[1] : '';
+
+            // Clean up the OFI Analysis part (remove its starting delimiter if present)
+            if (ofiAnalysis.startsWith('---OFI_ANALYSIS---')) {
+                ofiAnalysis = ofiAnalysis.substring('---OFI_ANALYSIS---'.length).trim();
+            }
+
+            // --- Styling the Biblical Quote within the Biblical Answer Section ---
             const verseRegex = /(".*?"\s*-\s*[^.\n]*)/s;
-            const verseMatch = text.match(verseRegex);
+            const verseMatch = biblicalAnswer.match(verseRegex);
             
-            let formattedText = text;
+            let formattedBiblicalAnswer = biblicalAnswer;
 
             if (verseMatch) {
                 const verseBlock = verseMatch[0];
                 const styledVerse = `<div class="biblical-quote p-4 rounded-md italic mt-4 mb-4 text-gray-800">${verseBlock}</div>`;
-                formattedText = text.replace(verseBlock, styledVerse);
+                // Replace the plain text verse block with the styled HTML
+                formattedBiblicalAnswer = biblicalAnswer.replace(verseBlock, styledVerse);
             }
+            
+            // Replace newlines with <br> for better presentation in both sections
+            const formattedOFIAnalysis = ofiAnalysis.replace(/\n/g, '<br>');
+            formattedBiblicalAnswer = formattedBiblicalAnswer.replace(/\n/g, '<br>');
 
-            // Replace newlines with <br> for better presentation
-            aiTextDiv.innerHTML = formattedText.replace(/\n/g, '<br>');
+
+            // Render the split results
+            ofiAnalysisTextDiv.innerHTML = formattedOFIAnalysis;
+            biblicalAnswerTextDiv.innerHTML = formattedBiblicalAnswer;
             
             // Render Resources
             resourceList.innerHTML = '';
@@ -318,7 +356,7 @@ Version 6
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>`;
 
-                    // --- STRUCTURAL FIX: Create the <a> element directly and append it. ---
+                    // Create the <a> element directly and append it.
                     const link = document.createElement('a');
                     link.href = source.uri;
                     link.target = "_blank";
@@ -352,4 +390,3 @@ Version 6
     </script>
 </body>
 </html>
-
