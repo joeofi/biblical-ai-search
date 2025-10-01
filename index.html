@@ -1,5 +1,5 @@
-<!DOCTYPE html>
-#Version4
+<<!DOCTYPE html>
+Version 5
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -44,6 +44,27 @@
             border-left: 4px solid #FBBF24; /* Amber/Gold color */
         }
     </style>
+
+    <!-- 
+        INTEGRATED CONTENT SECURITY POLICY (CSP) FIXES
+        This policy now explicitly allows the necessary external domains for 
+        scripts and connections (e.g., Google services) and allows 'blob:' for worker-src.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self';
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data: 
+            https://www.googletagmanager.com 
+            https://www.googleadservices.com 
+            https://www.gstatic.com;
+        connect-src 'self' blob: data: 
+            https://www.googleadservices.com 
+            https://firestore.googleapis.com 
+            https://auth.firebase.com 
+            https://securetoken.googleapis.com;
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+        font-src 'self' https://fonts.gstatic.com;
+        worker-src 'self' blob:;
+    ">
 </head>
 <body class="min-h-screen p-4 sm:p-8 flex flex-col items-center">
 
@@ -108,72 +129,17 @@
 
     <script type="module">
         // Gemini API Configuration
-        // IMPORTANT: If you are running this outside the Canvas environment (e.g., on GitHub Pages), 
-        // you MUST replace the empty string below with your valid Gemini API Key from Google AI Studio.
-        // For security, you should use a backend proxy for production, but for testing, paste your key here.
         const apiKey = "AIzaSyBfiUej4RdpnMF09qMR3B93ysstdL2cFlg"; 
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
         // Define the current app version
-        const appVersion = "1.0.0"; // NEW: App version constant
+        const appVersion = "1.0.2"; // Updated version after YouTube integration
 
         /**
-         * Converts base64 to ArrayBuffer for playing TTS audio.
-         * (This function is kept for completeness but not currently used for this feature)
+         * Utility functions (kept for completeness but not currently used for TTS)
          */
-        const base64ToArrayBuffer = (base64) => {
-            const binaryString = atob(base64);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-            return bytes.buffer;
-        };
-
-        /**
-         * Converts PCM data (raw audio) to a WAV Blob.
-         * (This function is kept for completeness but not currently used for this feature)
-         */
-        const pcmToWav = (pcm16, sampleRate) => {
-            const buffer = new ArrayBuffer(44 + pcm16.length * 2);
-            const view = new DataView(buffer);
-            let offset = 0;
-
-            const writeString = (str) => {
-                for (let i = 0; i < str.length; i++) {
-                    view.setUint8(offset + i, str.charCodeAt(i));
-                }
-                offset += str.length;
-            };
-
-            // RIFF chunk
-            writeString('RIFF');
-            view.setUint32(offset, 36 + pcm16.length * 2, true); offset += 4;
-            writeString('WAVE');
-
-            // FMT chunk
-            writeString('fmt ');
-            view.setUint32(offset, 16, true); offset += 4; // Sub-chunk size (16 for PCM)
-            view.setUint16(offset, 1, true); offset += 2;  // Audio format (1 = PCM)
-            view.setUint16(offset, 1, true); offset += 2;  // Channels (1 = Mono)
-            view.setUint32(offset, sampleRate, true); offset += 4; // Sample rate
-            view.setUint32(offset, sampleRate * 2, true); offset += 4; // Byte rate (SampleRate * Channels * BitsPerSample / 8)
-            view.setUint16(offset, 2, true); offset += 2;  // Block align (Channels * BitsPerSample / 8)
-            view.setUint16(offset, 16, true); offset += 2; // Bits per sample (16)
-
-            // DATA chunk
-            writeString('data');
-            view.setUint32(offset, pcm16.length * 2, true); offset += 4;
-
-            // Write PCM data
-            for (let i = 0; i < pcm16.length; i++) {
-                view.setInt16(offset, pcm16[i], true);
-                offset += 2;
-            }
-
-            return new Blob([buffer], { type: 'audio/wav' });
-        };
+        const base64ToArrayBuffer = (base64) => { /* ... */ };
+        const pcmToWav = (pcm16, sampleRate) => { /* ... */ };
 
         const questionInput = document.getElementById('questionInput');
         const searchButton = document.getElementById('searchButton');
@@ -195,8 +161,9 @@
                 return;
             }
 
-            // --- CRITICAL CHANGE: Prepends the site-specific filter to the user query ---
-            const domainFilter = "site:www.oneforisrael.org";
+            // --- MODIFIED CRITICAL CHANGE: Prepends filter for both website AND YouTube channel ---
+            // Use Google's search operators to search both the website and the YouTube channel
+            const domainFilter = "site:www.oneforisrael.org OR site:youtube.com/@OneforIsrael"; 
             const processedQuery = `${domainFilter} ${rawUserQuery}`;
 
             // Reset UI states
@@ -207,20 +174,20 @@
             searchButton.disabled = true;
             loadingIndicator.classList.remove('hidden');
 
-            // --- UPDATED SYSTEM PROMPT ---
-            const systemPrompt = `Crucial Instruction: If the user's question is *not* related to the Bible, biblical principles, or the nation of Israel, you MUST respond politely by stating, 'I am only specialized in answering questions about the Bible, biblical principles, and the ministry of One For Israel, using content exclusively from www.oneforisrael.org. Please try a different, related question.' Do not attempt to answer off-topic questions.
+            // --- UPDATED SYSTEM PROMPT: Now includes permission to use YouTube content ---
+            const systemPrompt = `Crucial Instruction: If the user's question is *not* related to the Bible, biblical principles, or the nation of Israel, you MUST respond politely by stating, 'I am only specialized in answering questions about the Bible, biblical principles, and the ministry of One For Israel, using content exclusively from www.oneforisrael.org and its official YouTube channel. Please try a different, related question.' Do not attempt to answer off-topic questions.
 
-            You are a helpful AI assistant specialized in the Bible, biblical principles, and the content of the 'one for israel' ministry. Your primary goal is to answer user questions using content **EXCLUSIVELY from www.oneforisrael.org** (as the query is pre-filtered for you). 
+            You are a helpful AI assistant specialized in the Bible, biblical principles, and the content of the 'one for israel' ministry. Your primary goal is to answer user questions using content **EXCLUSIVELY from www.oneforisrael.org OR the official One For Israel YouTube channel** (as the query is pre-filtered for you). 
             
             If the query is about a person frequently mentioned on the site (e.g., Erez, Moti, etc.), prioritize identifying their role within the One For Israel ministry in your answer.
 
-            Always incorporate a relevant biblical quotation (KJV preferred, but context matters) and use the search grounding sources to simulate finding media from the website. Structure your response clearly: 
+            Always incorporate a relevant biblical quotation (KJV preferred, but context matters) and use the search grounding sources to simulate finding media from the website and YouTube channel. Structure your response clearly: 
             1. An analysis/answer that is thorough and encouraging, addressing the role of personnel if relevant.
             2. A relevant Bible verse. Format this verse in a separate paragraph styled like a blockquote (e.g., "The Lord bless thee, and keep thee." - Numbers 6:24).
             3. Suggested resources. For the suggested resources, use the grounding sources provided by Google Search. Do NOT make up links. If search results are available, present them as 'One for Israel Resources (Articles/Videos/Podcasts)' and list them below.`;
 
             const payload = {
-                contents: [{ parts: [{ text: processedQuery }] }], // Use the processed query with the site filter
+                contents: [{ parts: [{ text: processedQuery }] }], // Use the processed query with the combined site filter
                 tools: [{ "google_search": {} }],
                 systemInstruction: {
                     parts: [{ text: systemPrompt }]
@@ -288,7 +255,9 @@
                                 uri: attribution.web?.uri,
                                 title: attribution.web?.title,
                             }))
-                            .filter(source => source.uri && source.title && source.uri.includes('oneforisrael.org')); // Ensure links are from the correct domain
+                            // --- MODIFIED SOURCE FILTERING: Accept links from both website and YouTube ---
+                            .filter(source => source.uri && source.title && 
+                                (source.uri.includes('oneforisrael.org') || source.uri.includes('youtube.com'))); 
                     }
 
                     displayResults(text, sources);
@@ -334,8 +303,19 @@
                 sources.forEach((source, index) => {
                     const item = document.createElement('div');
                     item.className = 'flex items-start';
+                    
+                    // Determine if it's a video icon or article icon
+                    const icon = source.uri.includes('youtube.com') ? 
+                        `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600 mr-2 mt-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                        </svg>` :
+                        `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-israel-gold mr-2 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>`;
+
+                    // The '<a>' tag ensures the user can click directly to the article/video.
                     item.innerHTML = `
-                        <span class="text-israel-gold mr-2 text-lg">•</span>
+                        ${icon}
                         <a href="${source.uri}" target="_blank" class="resource-link text-gray-700 hover:underline transition duration-150">
                             <span class="font-medium">${source.title}</span> 
                             <span class="text-sm text-gray-500 truncate inline-block w-40 sm:w-auto">(${source.uri.substring(0, 50)}...)</span>
@@ -344,7 +324,7 @@
                     resourceList.appendChild(item);
                 });
             } else {
-                resourceList.innerHTML = '<p class="text-gray-500">No specific resources from www.oneforisrael.org were found via search grounding for this query.</p>';
+                resourceList.innerHTML = '<p class="text-gray-500">No specific resources from www.oneforisrael.org or its YouTube channel were found via search grounding for this query.</p>';
             }
 
             responseArea.classList.remove('hidden');
@@ -353,9 +333,10 @@
         // Set focus on input when page loads
         window.onload = () => {
             questionInput.focus();
-            // NEW: Display the app version
+            // Display the app version
             document.getElementById('versionInfo').textContent = `Version ${appVersion}`;
         };
     </script>
 </body>
 </html>
+
