@@ -48,7 +48,7 @@
 
     <!-- Header -->
     <header class="w-full container text-center mb-8">
-        <h1 class="text-4xl font-extrabold text-israel-blue">
+        <h1 class="4xl font-extrabold text-israel-blue">
             <span class="text-israel-gold">One For Israel</span> AI Search
         </h1>
         <p class="text-lg text-gray-600 mt-2">Ask a question about the Bible, Israel, or biblical principles.</p>
@@ -106,7 +106,10 @@
 
     <script type="module">
         // Gemini API Configuration
-        const apiKey = ""; // Leave as-is, will be populated by the environment
+        // IMPORTANT: If you are running this outside the Canvas environment (e.g., on GitHub Pages), 
+        // you MUST replace the empty string below with your valid Gemini API Key from Google AI Studio.
+        // For security, you should use a backend proxy for production, but for testing, paste your key here.
+        const apiKey = "AIzaSyBfiUej4RdpnMF09qMR3B93ysstdL2cFlg"; 
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
         /**
@@ -221,6 +224,11 @@
 
             for (let i = 0; i < maxRetries; i++) {
                 try {
+                    // Check if the API key is present before fetching
+                    if (!apiKey && window.location.protocol.startsWith('http')) {
+                         throw new Error("API Key is missing for external deployment.");
+                    }
+                    
                     response = await fetch(apiUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -234,12 +242,20 @@
                         await new Promise(resolve => setTimeout(resolve, delay));
                         delay *= 2;
                     } else {
-                        throw new Error(`API returned status ${response.status}`);
+                        // Throw error to be caught below
+                        const errorBody = await response.text();
+                        throw new Error(`API returned status ${response.status}: ${errorBody.substring(0, 100)}...`);
                     }
                 } catch (error) {
-                    if (i === maxRetries - 1) {
-                        console.error('API call failed after all retries:', error);
-                        errorMessage.textContent = 'An error occurred while communicating with the AI. Please try again later.';
+                    if (i === maxRetries - 1 || error.message.includes("API Key is missing")) {
+                        console.error('API call failed after all retries or due to missing key:', error);
+                        // Provide more specific feedback if the key is missing on a hosted environment
+                        if (!apiKey && window.location.protocol.startsWith('http')) {
+                            errorMessage.textContent = 'API Key Error: Please insert your Gemini API key in the index.html file to run this on a public web server.';
+                        } else {
+                            errorMessage.textContent = 'An error occurred while communicating with the AI. Please try again later.';
+                        }
+                        
                         errorMessage.classList.remove('hidden');
                         return;
                     }
