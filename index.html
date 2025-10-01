@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-Version 8
+Version 10
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -154,7 +154,7 @@ Version 8
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
         // Define the current app version
-        const appVersion = "1.0.6"; // Updated version for robustness and prompt refinement
+        const appVersion = "1.0.7"; // Updated version for targeted personnel search
 
         /**
          * Utility functions (kept for completeness but not currently used for TTS)
@@ -188,7 +188,9 @@ Version 8
 
             // --- CRITICAL CHANGE: Prepends filter for both website AND YouTube channel ---
             const domainFilter = "site:www.oneforisrael.org OR site:youtube.com/@OneforIsrael"; 
-            const processedQuery = `${domainFilter} ${rawUserQuery}`;
+            
+            // --- VERSION 1.0.7 CHANGE: Add a specific instruction to the query text to force the AI to look for roles, addressing the Erez issue. ---
+            const processedQuery = `${domainFilter} ${rawUserQuery}. If this query asks about a person, specifically search for their title, role, and position within the ministry, such as 'President' or 'Founder'.`;
 
             // Reset UI states
             errorMessage.classList.add('hidden');
@@ -215,7 +217,7 @@ Version 8
             `;
 
             const payload = {
-                contents: [{ parts: [{ text: processedQuery }] }], // Use the processed query with the combined site filter
+                contents: [{ parts: [{ text: processedQuery }] }], // Use the processed query with the combined site filter and hint
                 tools: [{ "google_search": {} }],
                 systemInstruction: {
                     parts: [{ text: systemPrompt }]
