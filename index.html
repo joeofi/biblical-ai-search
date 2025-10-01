@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-#Version3
+#Version4
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -53,6 +53,7 @@
             <span class="text-israel-gold">One For Israel</span> AI Search
         </h1>
         <p class="text-lg text-gray-600 mt-2">Ask a question about the Bible, Israel, or biblical principles.</p>
+        <p id="versionInfo" class="text-sm text-gray-500 mt-1"></p><!-- New element to display version -->
     </header>
 
     <!-- Main Content Container -->
@@ -112,6 +113,9 @@
         // For security, you should use a backend proxy for production, but for testing, paste your key here.
         const apiKey = "AIzaSyBfiUej4RdpnMF09qMR3B93ysstdL2cFlg"; 
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        // Define the current app version
+        const appVersion = "1.0.0"; // NEW: App version constant
 
         /**
          * Converts base64 to ArrayBuffer for playing TTS audio.
@@ -349,6 +353,8 @@
         // Set focus on input when page loads
         window.onload = () => {
             questionInput.focus();
+            // NEW: Display the app version
+            document.getElementById('versionInfo').textContent = `Version ${appVersion}`;
         };
     </script>
 </body>
